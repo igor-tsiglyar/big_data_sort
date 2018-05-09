@@ -4,6 +4,7 @@
 #include <map>
 #include <fstream>
 #include <regex>
+#include <omp.h>
 
 
 std::shared_ptr<std::map<int, std::string>> read_records(const std::string & filepath) {
@@ -57,8 +58,12 @@ void sort(std::vector<int> & keys, std::vector<int> & temp, int start, int end)
 {
     if(start < end) {
         int centre = (start + end) / 2;
+
+        #pragma omp task shared(keys, temp)
         sort(keys, temp, start, centre);
         sort(keys, temp, centre + 1, end);
+
+        #pragma omp taskwait
         merge(keys, temp, start, centre, end);
     }
 }
@@ -70,6 +75,8 @@ std::shared_ptr<std::vector<int>> get_write_order(const std::map<int, std::strin
                    [](const std::map<int, std::string>::value_type & pair) { return pair.first; });
     std::shared_ptr<std::vector<int>> temp = std::make_shared<std::vector<int>>(keys->size());
 
+    #pragma omp parallel
+    #pragma omp single
     sort(*keys, *temp, 0, keys->size() - 1);
 
     return keys;
