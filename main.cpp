@@ -33,13 +33,13 @@ void merge(std::vector<int> & keys, std::vector<int> & temp, int start, int cent
     int num_pos = start;
     int final_pos = start;
 
-    while(num_pos <= centre) {
+    while (num_pos <= centre) {
         temp[tmp_pos++] = keys[num_pos++];
     }
 
     tmp_pos = 0;
 
-    while(final_pos < num_pos && num_pos <= end)
+    while (final_pos < num_pos && num_pos <= end)
     {
         if(temp[tmp_pos] <= keys[num_pos]) {
             keys[final_pos++] = temp[tmp_pos++];
@@ -48,7 +48,7 @@ void merge(std::vector<int> & keys, std::vector<int> & temp, int start, int cent
         }
     }
 
-    while(final_pos < num_pos) {
+    while (final_pos < num_pos) {
         keys[final_pos++] = temp[tmp_pos++];
     }
 }
@@ -56,14 +56,32 @@ void merge(std::vector<int> & keys, std::vector<int> & temp, int start, int cent
 
 void sort(std::vector<int> & keys, std::vector<int> & temp, int start, int end)
 {
-    if(start < end) {
+    if (start < end) {
         int centre = (start + end) / 2;
 
-        #pragma omp task shared(keys, temp)
         sort(keys, temp, start, centre);
         sort(keys, temp, centre + 1, end);
 
-        #pragma omp taskwait
+        merge(keys, temp, start, centre, end);
+    }
+}
+
+
+void parallel_sort(int threads, std::vector<int> & keys, std::vector<int> & temp, int start, int end)
+{
+    if ( threads == 1) {
+        sort(keys, temp, start, end);
+    } else if (threads > 1) {
+        int centre = (start + end) / 2;
+
+        #pragma omp parallel sections
+        {
+            #pragma omp section
+            parallel_sort(threads / 2, keys, temp, start, centre);
+            #pragma omp section
+            parallel_sort(threads - threads / 2, keys, temp, centre + 1, end);
+        }
+
         merge(keys, temp, start, centre, end);
     }
 }
@@ -74,10 +92,15 @@ std::shared_ptr<std::vector<int>> get_write_order(const std::map<int, std::strin
     std::transform(records.cbegin(), records.cend(), std::back_inserter(*keys),
                    [](const std::map<int, std::string>::value_type & pair) { return pair.first; });
     std::shared_ptr<std::vector<int>> temp = std::make_shared<std::vector<int>>(keys->size());
+    int num_threads;
 
     #pragma omp parallel
-    #pragma omp single
-    sort(*keys, *temp, 0, keys->size() - 1);
+    {
+        #pragma omp master
+        num_threads = omp_get_num_threads();
+    }
+
+    parallel_sort(num_threads, *keys, *temp, 0, keys->size() - 1);
 
     return keys;
 };
