@@ -92,13 +92,7 @@ std::shared_ptr<std::vector<int>> get_write_order(const std::map<int, std::strin
     std::transform(records.cbegin(), records.cend(), std::back_inserter(*keys),
                    [](const std::map<int, std::string>::value_type & pair) { return pair.first; });
     std::shared_ptr<std::vector<int>> temp = std::make_shared<std::vector<int>>(keys->size());
-    int num_threads;
-
-    #pragma omp parallel
-    {
-        #pragma omp master
-        num_threads = omp_get_num_threads();
-    }
+    int num_threads = 4;
 
     parallel_sort(num_threads, *keys, *temp, 0, keys->size() - 1);
 
